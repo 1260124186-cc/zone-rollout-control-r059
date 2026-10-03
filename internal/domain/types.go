@@ -119,16 +119,25 @@ type Probe struct {
 	PayloadFingerprint string    `json:"payload_fingerprint"`
 }
 
+// ObservationRollup is the deterministic per-plan summary derived from every
+// probe persisted during the rollout. It is recomputed from the probe history
+// rather than maintained incrementally, so the same observations always yield
+// the same coverage and verdict, including after a process restart.
 type ObservationRollup struct {
-	PlanID           string              `json:"plan_id"`
-	RevisionID       string              `json:"revision_id"`
-	ProbeCount       int                 `json:"probe_count"`
-	SuccessCount     int                 `json:"success_count"`
-	MaximumLatencyMS int                 `json:"maximum_latency_ms"`
-	ObservedNodes    map[string]struct{} `json:"observed_nodes"`
-	SerialMismatches int                 `json:"serial_mismatches"`
-	Watermark        time.Time           `json:"watermark"`
-	UpdatedAt        time.Time           `json:"updated_at"`
+	PlanID string
+	// ProbeCount is the number of persisted probes; repeated reports from the
+	// same node are all counted here even though the node participates once.
+	ProbeCount       int
+	SuccessCount     int
+	MaximumLatencyMS int
+	// ObservedNodes is the distinct set of nodes that submitted at least one
+	// probe, regardless of whether that probe succeeded.
+	ObservedNodes map[string]struct{}
+	// SuccessfulNodes is the distinct set of nodes that submitted at least one
+	// successful probe. Every expected node must appear in this set before the
+	// assessment can pass.
+	SuccessfulNodes  map[string]struct{}
+	SerialMismatches int
 }
 
 type RolloutAssessment struct {
@@ -163,7 +172,6 @@ type State struct {
 	Leases                map[string]NodeLease         `json:"leases"`
 	LeaseGroups           map[string]LeaseGroup        `json:"lease_groups"`
 	Probes                map[string]Probe             `json:"probes"`
-	ObservationRollups    map[string]ObservationRollup `json:"observation_rollups"`
 	Assessments           map[string]RolloutAssessment `json:"assessments"`
 	LeaseRequestKeys      map[string]string            `json:"lease_request_keys"`
 	AssessmentRequestKeys map[string]string            `json:"assessment_request_keys"`

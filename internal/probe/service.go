@@ -88,12 +88,6 @@ func (s *Service) Submit(
 				"state":   plan.State,
 			})
 		}
-		revision, ok := state.Revisions[plan.LatestRevisionID]
-		if !ok {
-			return domain.NewError(domain.CodeStorageFailure, "plan references a missing revision", map[string]any{
-				"revision_id": plan.LatestRevisionID,
-			})
-		}
 		node, ok := state.Nodes[lease.NodeID]
 		if !ok {
 			return domain.NewError(domain.CodeStorageFailure, "lease references a missing node", map[string]any{
@@ -114,7 +108,6 @@ func (s *Service) Submit(
 			PayloadFingerprint: fingerprint,
 		}
 		state.Probes[result.ID] = result
-		domain.RecordObservation(state, plan, revision, result)
 		lease.State = domain.LeaseReported
 		finishedAt := now
 		lease.FinishedAt = &finishedAt

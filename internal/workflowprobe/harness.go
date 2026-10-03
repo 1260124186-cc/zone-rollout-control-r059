@@ -36,9 +36,17 @@ func newHarness() (*harness, error) {
 	if err != nil {
 		return nil, fmt.Errorf("create temporary directory: %w", err)
 	}
-	stateStore, err := store.Open(tempDir + "/state.json")
+	h, err := newHarnessAt(tempDir)
 	if err != nil {
 		_ = os.RemoveAll(tempDir)
+		return nil, err
+	}
+	return h, nil
+}
+
+func newHarnessAt(tempDir string) (*harness, error) {
+	stateStore, err := store.Open(tempDir + "/state.json")
+	if err != nil {
 		return nil, fmt.Errorf("open temporary store: %w", err)
 	}
 	clock := platform.NewManualClock(time.Date(2026, time.September, 25, 12, 0, 0, 0, time.UTC))
@@ -53,7 +61,6 @@ func newHarness() (*harness, error) {
 
 	listener, err := net.Listen("tcp", "127.0.0.1:0")
 	if err != nil {
-		_ = os.RemoveAll(tempDir)
 		return nil, fmt.Errorf("listen: %w", err)
 	}
 	server := &http.Server{Handler: api.Handler(), ReadHeaderTimeout: 5 * time.Second}
@@ -68,6 +75,23 @@ func newHarness() (*harness, error) {
 		listener: listener,
 		tempDir:  tempDir,
 	}, nil
+}
+
+// restart closes the in-process server and reopens the same JSON snapshot,
+// simulating a control-plane restart without losing persisted history.
+func (h *harness) restart() error {
+	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+	defer cancel()
+	if err := h.server.Shutdown(ctx); err != nil {
+		return err
+	}
+	_ = h.listener.Close()
+	reopened, err := newHarnessAt(h.tempDir)
+	if err != nil {
+		return err
+	}
+	*h = *reopened
+	return nil
 }
 
 func (h *harness) close() {

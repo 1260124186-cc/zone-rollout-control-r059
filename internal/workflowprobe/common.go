@@ -2,6 +2,7 @@ package workflowprobe
 
 import (
 	"net/http"
+	"time"
 
 	"solo-0014-zone-rollout-control/internal/domain"
 )
@@ -79,13 +80,25 @@ func submitProbe(
 	serial uint32,
 	latency int,
 ) (domain.Probe, error) {
+	return submitProbeAt(harness, leaseID, requestKey, success, serial, latency, harness.clock.Now())
+}
+
+func submitProbeAt(
+	harness *harness,
+	leaseID string,
+	requestKey string,
+	success bool,
+	serial uint32,
+	latency int,
+	observedAt time.Time,
+) (domain.Probe, error) {
 	var result domain.Probe
 	err := harness.call(http.MethodPatch, "/v1/leases/"+leaseID+"/probes", domain.ProbeInput{
 		RequestKey:     requestKey,
 		Success:        success,
 		ObservedSerial: serial,
 		LatencyMS:      latency,
-		ObservedAt:     harness.clock.Now(),
+		ObservedAt:     observedAt,
 	}, &result)
 	return result, err
 }

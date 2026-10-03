@@ -61,7 +61,7 @@ func (s *Service) Evaluate(
 				"revision_id": plan.LatestRevisionID,
 			})
 		}
-		rollup := domain.ObservationRollupFor(state, planID)
+		rollup := domain.DeriveObservationRollup(state, plan, revision)
 		if rollup.ProbeCount == 0 {
 			return domain.NewError(domain.CodeNoProbes, "plan has no probes to assess", map[string]any{
 				"plan_id": planID,
