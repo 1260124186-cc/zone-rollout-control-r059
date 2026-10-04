@@ -84,6 +84,9 @@ func BuildAssessment(
 	if len(rollup.ObservedNodes) < plan.ExpectedNodes {
 		reasons["node_not_observed"] = struct{}{}
 	}
+	if len(rollup.SuccessfulNodes) < plan.ExpectedNodes {
+		reasons["node_not_observed"] = struct{}{}
+	}
 	successRatio := 0.0
 	if rollup.ProbeCount > 0 {
 		successRatio = round(float64(rollup.SuccessCount)/float64(rollup.ProbeCount), 6)
@@ -117,55 +120,38 @@ func BuildAssessment(
 	}
 }
 
-func ObservationRollupFor(state *State, planID string) ObservationRollup {
-	if state == nil || state.ObservationRollups == nil {
-		return ObservationRollup{PlanID: planID}
+// DeriveObservationRollup rebuilds the plan-wide observation rollup solely from
+// the probes that were actually committed during the rollout. It is a pure
+// function of the stored probe history: it does not depend on submission order
+// or observed_at ordering, so late arrivals with an earlier observed time are
+// still counted, and re-deriving after a restart yields the same rollup.
+func DeriveObservationRollup(state *State, planID, revisionID string, expectedSerial uint32) ObservationRollup {
+	rollup := ObservationRollup{
+		PlanID:          planID,
+		RevisionID:      revisionID,
+		ObservedNodes:   make(map[string]struct{}),
+		SuccessfulNodes: make(map[string]struct{}),
 	}
-	rollup, ok := state.ObservationRollups[planID]
-	if !ok {
-		return ObservationRollup{PlanID: planID}
-	}
-	return rollup
-}
-
-func RecordObservation(
-	state *State,
-	plan RolloutPlan,
-	revision ZoneRevision,
-	probe Probe,
-) ObservationRollup {
-	if state.ObservationRollups == nil {
-		state.ObservationRollups = make(map[string]ObservationRollup)
-	}
-	rollup, ok := state.ObservationRollups[probe.PlanID]
-	if !ok {
-		rollup = ObservationRollup{
-			PlanID:        probe.PlanID,
-			ObservedNodes: make(map[string]struct{}),
-		}
-	}
-	if rollup.ObservedNodes == nil {
-		rollup.ObservedNodes = make(map[string]struct{})
-	}
-	if probe.ObservedAt.Before(rollup.Watermark) {
-		state.ObservationRollups[probe.PlanID] = rollup
+	if state == nil {
 		return rollup
 	}
-	rollup.RevisionID = revision.ID
-	rollup.ProbeCount++
-	if probe.Success {
-		rollup.SuccessCount++
-		if probe.ObservedSerial != revision.Serial {
-			rollup.SerialMismatches++
+	for _, probe := range state.Probes {
+		if probe.PlanID != planID {
+			continue
+		}
+		rollup.ProbeCount++
+		rollup.ObservedNodes[probe.NodeID] = struct{}{}
+		if probe.Success {
+			rollup.SuccessCount++
+			rollup.SuccessfulNodes[probe.NodeID] = struct{}{}
+			if probe.ObservedSerial != expectedSerial {
+				rollup.SerialMismatches++
+			}
+		}
+		if probe.LatencyMS > rollup.MaximumLatencyMS {
+			rollup.MaximumLatencyMS = probe.LatencyMS
 		}
 	}
-	if probe.LatencyMS > rollup.MaximumLatencyMS {
-		rollup.MaximumLatencyMS = probe.LatencyMS
-	}
-	rollup.ObservedNodes[probe.LeaseID] = struct{}{}
-	rollup.Watermark = probe.ObservedAt
-	rollup.UpdatedAt = probe.StoredAt
-	state.ObservationRollups[probe.PlanID] = rollup
 	return rollup
 }
 

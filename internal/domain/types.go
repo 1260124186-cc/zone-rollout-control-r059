@@ -126,9 +126,8 @@ type ObservationRollup struct {
 	SuccessCount     int                 `json:"success_count"`
 	MaximumLatencyMS int                 `json:"maximum_latency_ms"`
 	ObservedNodes    map[string]struct{} `json:"observed_nodes"`
+	SuccessfulNodes  map[string]struct{} `json:"successful_nodes"`
 	SerialMismatches int                 `json:"serial_mismatches"`
-	Watermark        time.Time           `json:"watermark"`
-	UpdatedAt        time.Time           `json:"updated_at"`
 }
 
 type RolloutAssessment struct {
@@ -163,7 +162,6 @@ type State struct {
 	Leases                map[string]NodeLease         `json:"leases"`
 	LeaseGroups           map[string]LeaseGroup        `json:"lease_groups"`
 	Probes                map[string]Probe             `json:"probes"`
-	ObservationRollups    map[string]ObservationRollup `json:"observation_rollups"`
 	Assessments           map[string]RolloutAssessment `json:"assessments"`
 	LeaseRequestKeys      map[string]string            `json:"lease_request_keys"`
 	AssessmentRequestKeys map[string]string            `json:"assessment_request_keys"`
